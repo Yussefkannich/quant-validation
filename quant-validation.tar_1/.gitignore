@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+funding_log.csv
+funding_alarms.log
+funding_alarm_state.json
+funding_cron.log
+*.csv
