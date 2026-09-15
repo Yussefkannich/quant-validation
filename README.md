@@ -2,7 +2,7 @@
 
 Ein Werkzeugkasten, um Handelsstrategien ergebnisoffen zu prüfen — und sie fallenzulassen, wenn sie nicht tragen.
 
-Dieses Repository enthält keine Strategie, die funktioniert. Es enthält die Methode, mit der vier populäre Ansätze widerlegt wurden, und die Zahlen dazu. Das ist Absicht: Der Wert liegt in der Prüfkette, nicht im Ergebnis.
+Dieses Repository enthält keine Strategie, die funktioniert. Es enthält die Methode, mit der fünf populäre Ansätze widerlegt wurden, und die Zahlen dazu. Das ist Absicht: Der Wert liegt in der Prüfkette, nicht im Ergebnis.
 
 *An English summary follows at the end.*
 
@@ -16,12 +16,14 @@ Dieses Repository enthält keine Strategie, die funktioniert. Es enthält die Me
 | Ichimoku Kinko Hyo (Aktien) | — | −18,3% p.a. gegen Buy & Hold | verworfen |
 | Ichimoku Kinko Hyo (Krypto) | +4,8% p.a. bei 0,10% Gebühren | +2,5% bei realistischen 0,26% | verworfen |
 | Fair Value Gap / ICT (Tagesbasis) | Füllquote 77–85% | Zufallszonen: 79–83% | verworfen |
+| EMA-Crossover 12/26 (Aktien) | −11,8% p.a. gegen Buy & Hold | 36. Perzentil gegen Zufallstiming | verworfen |
+| EMA-Crossover 12/26 (Krypto) | +7,0% p.a., 96,8. Perzentil | out-of-sample 87,7. Perzentil, vor 2022 kein Vorsprung | verworfen |
 | **R3 / Larry Connors (RSI-2)** | **+0,50% je Trade, t=5,75 nach Cluster-Korrektur** | **out-of-sample 1 von 6 Märkten** | **verworfen** |
 | Funding-Rate-Carry (Perpetuals) | Werbung: 10–30% p.a. | gemessen: 0,3–0,4% p.a. netto | derzeit unattraktiv |
 
 Jede Zeile ist reproduzierbar. Die Befehle stehen weiter unten.
 
-**R3 ist der interessanteste Fall.** Die anderen drei brachen im ersten Test zusammen. R3 überstand drei Prüfstufen — Zufallskontrolle, Cluster-Korrektur, Ausschluss der stärksten Werte — und fiel erst an der vierten. Nach jedem üblichen Maßstab wäre es eine bestätigte Strategie gewesen.
+**R3 ist der interessanteste Fall.** Relative Strength, Ichimoku und Fair Value Gap brachen früh zusammen. Der EMA-Crossover auf Krypto bestand immerhin die Zufallskontrolle und verfehlte out-of-sample die Hürde nur knapp. R3 überstand drei Prüfstufen — Zufallskontrolle, Cluster-Korrektur, Ausschluss der stärksten Werte — und fiel erst an der vierten. Nach jedem üblichen Maßstab wäre es eine bestätigte Strategie gewesen.
 
 ---
 
@@ -61,6 +63,7 @@ Jedes Skript läuft eigenständig, hat `--selftest` und braucht keine API-Schlü
 | `ichimoku_backtest.py` | Ichimoku Kinko Hyo gegen Buy & Hold *und* gegen Zufallstiming mit gleicher Marktzeit |
 | `fvg_backtest.py` | Fair Value Gap gegen Zufallszonen gleicher Breite, gleichen Abstands, gleicher Richtung |
 | `r3_backtest.py` | R3 nach Larry Connors gegen Zufallseinstiege gleicher Haltedauer |
+| `ema_crossover_backtest.py` | EMA-Crossover gegen Buy & Hold und Zufallstiming, Parameter-Gitter mit EMA und SMA nebeneinander |
 
 ### pruefung/
 
@@ -70,6 +73,7 @@ Jedes Skript läuft eigenständig, hat `--selftest` und braucht keine API-Schlü
 | `rs_stress.py` | Treiberausschluss und Leave-one-out, Teilperioden, Long-Short, Beta-Adjustierung, Zufallsportfolios |
 | `r3_stress.py` | Cluster-korrigierte Signifikanz, Portfolio-Simulation mit begrenzten Plätzen, Verlustverteilung, Gebührenstaffel |
 | `r3_oos.py` | Out-of-Sample auf sechs Märkten, die im Haupttest nicht vorkamen — ohne jede Parametersuche |
+| `ema_oos.py` | Out-of-Sample des EMA-Crossovers auf zehn neuen Coins, Parameter und Hürde fest im Code |
 
 ### monitor/
 
@@ -83,7 +87,7 @@ Jedes Skript läuft eigenständig, hat `--selftest` und braucht keine API-Schlü
 
 ```bash
 pip install yfinance pandas numpy
-./run_selftests.sh          # alle neun Selbsttests, ohne Netzverbindung
+./run_selftests.sh          # alle elf Selbsttests, ohne Netzverbindung
 ```
 
 ---
@@ -152,6 +156,32 @@ Auf zehn Aktien und Indizes: 22,2% gegen 40,5% bei Buy & Hold, t=−2,52. Der Dr
 
 Auf acht Kryptowährungen sah es besser aus (84. Perzentil), schrumpfte aber auf +2,5%, sobald realistische Gebühren angesetzt wurden. Die vorab festgelegte Hürde von 90 wurde nicht erreicht. Die traditionellen Werte 9/26/52 stammen aus der japanischen Sechs-Tage-Handelswoche der 1930er Jahre und waren nicht einmal der beste der sechs geprüften Parametersätze.
 
+### EMA-Crossover — knapp daneben ist daneben
+
+Der exponentiell gleitende Durchschnitt gewichtet jüngere Kurse stärker und reagiert schneller als der einfache. Das übliche Argument: Der SMA-Crossover scheitert an seiner Trägheit, mit dem EMA klappt es. Gehandelt wird, solange EMA(12) über EMA(26) liegt.
+
+```bash
+python3 strategien/ema_crossover_backtest.py
+python3 strategien/ema_crossover_backtest.py --tickers BTC-USD,ETH-USD,SOL-USD --kosten 0.0026
+python3 pruefung/ema_oos.py
+```
+
+**Aktien:** −11,84% p.a. gegen Buy & Hold, 36. Perzentil gegen Zufallstiming. Im Parameter-Gitter liegen EMA und SMA bei 12/26 gleichauf (−11,84% gegen −11,94%). Die Trägheit war nicht das Problem.
+
+**Krypto (BTC, ETH, SOL, 0,26% Gebühren):** +7,04% p.a., 96,8. Perzentil, fünf von sechs Parameterzellen positiv. Zwei Warnzeichen gab es schon hier: Der t-Wert der Tagesdifferenz war negativ, weil der Vorsprung aus geringerer Schwankung kam und nicht aus höheren Tagesrenditen, und er stammte fast nur aus der Zeit ab 2022.
+
+**Out-of-Sample auf zehn neuen Coins** (ADA, XRP, DOGE, LTC, BCH, LINK, BNB, TRX, AVAX, DOT), Parameter und Hürde vorab im Code festgeschrieben:
+
+| Hürde | Ergebnis | Nötig | |
+|---|---|---|---|
+| Mittleres Perzentil gegen Zufallstiming | 87,7 | 90 | — |
+| Coins vor Buy & Hold | 9 von 10 | 7 | erfüllt |
+| Vorsprung in beiden Teilperioden | bis 2022: −1,02% | beide positiv | — |
+
+Im Mittel +4,22% p.a., aber bei einem t-Wert auf Log-Renditen von 0,23. Dazu kommt eine Verzerrung zugunsten der Strategie: Bei acht der zehn Coins beginnen die Daten im Dezember 2017, nahe am damaligen Hoch.
+
+Was übrig bleibt, ist Risikominderung: ein größter Rückgang von −60,4% statt −89,5% bei 38–57% Marktzeit. Das war nicht die vorab gestellte Frage und müsste als eigener Versuch auf neuen Daten geprüft werden.
+
 ### Fair Value Gap — wenn eine Trefferquote nichts misst
 
 ```bash
@@ -169,7 +199,7 @@ python3 monitor/funding_monitor.py --now
 python3 monitor/funding_monitor.py --history --days 90
 ```
 
-Anders als die vier Chartmuster hat dieser Ansatz einen nachvollziehbaren Mechanismus: Eine Börse weist alle acht Stunden tatsächlich eine Zahlung zwischen Long- und Short-Seite an. Spot long plus Perpetual short kassiert sie richtungsunabhängig.
+Anders als die geprüften Signale hat dieser Ansatz einen nachvollziehbaren Mechanismus: Eine Börse weist alle acht Stunden tatsächlich eine Zahlung zwischen Long- und Short-Seite an. Spot long plus Perpetual short kassiert sie richtungsunabhängig.
 
 Gemessen am 12.09.2026: BTC 0,27% p.a. bei einem Break-even von 841 Tagen, ETH 0,91%, SOL 0,62%, XRP negativ. Über 90 Tage netto nach Gebühren: 0,3–0,4% p.a. bei 26–46% Perioden mit negativer Rate.
 
@@ -193,7 +223,7 @@ Wiederverwendbar für jede weitere Strategie, ungefähr in der Reihenfolge ihrer
 
 **Look-Ahead-Probe mit Gegenprobe.** Kurse nach einem Stichtag verändern, prüfen dass frühere Signale unverändert bleiben — und zusätzlich gegen eine absichtlich falsche Implementierung laufen lassen, um zu belegen, dass die Probe anschlägt.
 
-**Hürde vorher festlegen.** Bei Ichimoku 90. Perzentil, erreicht wurden 84,2. Bei R3 vier von sechs Universen, erreicht wurde eins. Knapp daneben ist daneben.
+**Hürde vorher festlegen.** Bei Ichimoku 90. Perzentil, erreicht wurden 84,2. Bei R3 vier von sechs Universen, erreicht wurde eins. Beim EMA-Crossover out-of-sample 90. Perzentil, erreicht wurden 87,7. Knapp daneben ist daneben.
 
 **Treiberausschluss.** Einzelne Werte entfernen und prüfen, ob der Effekt überlebt.
 
@@ -204,6 +234,7 @@ Wiederverwendbar für jede weitere Strategie, ungefähr in der Reihenfolge ihrer
 - Datenquelle ist yfinance, also Tagesdaten aus zweiter Hand. Für Intraday-Strategien ungeeignet.
 - Die Ticker-Listen bestehen aus heutigen Index-Mitgliedern. Der Survivorship Bias ist im Code dokumentiert, aber nicht behoben — dafür bräuchte es historische Index-Zusammensetzungen.
 - Fair Value Gap wird üblicherweise auf Minuten- und Stundencharts gehandelt. Das Tagesergebnis widerlegt die Tagesvariante sauber, die Intraday-Variante nur indirekt.
+- Die Krypto-Kursreihen von yfinance beginnen für viele Coins erst im Dezember 2017, nahe einem Höchststand. Das benachteiligt Buy & Hold.
 - Die Ausstiegsregeln sind bewusst einfach gehalten, meist ohne Stop-Loss.
 - Keine Steuern, keine Slippage-Modellierung über den Spread hinaus.
 - Ein negatives Out-of-Sample-Ergebnis widerlegt eine Strategie in den geprüften Märkten, nicht in allen denkbaren.
@@ -220,9 +251,11 @@ Keine Anlageberatung. Der Code dient der methodischen Prüfung von Handelsstrate
 
 A toolkit for testing trading strategies against proper null hypotheses — and discarding them when they don't hold up.
 
-This repository contains no working strategy. It contains the method by which four popular approaches were falsified, plus the numbers. That is deliberate: the value is in the validation chain, not in the result.
+This repository contains no working strategy. It contains the method by which five popular approaches were falsified, plus the numbers. That is deliberate: the value is in the validation chain, not in the result.
 
 The most instructive case is R3 (Larry Connors, 2-period RSI mean reversion). It passed three stages — beating matched random entries at +0.50% per trade, surviving cluster-corrected significance at t=5.75, and holding at 0.355% after excluding the four strongest tickers. By any conventional standard it was a confirmed strategy. It then failed out-of-sample: across six markets never used during development, only one cleared the pre-registered bar, and four of six turned negative from 2022 onward.
+
+An EMA crossover (12/26) on crypto was a near miss: it beat matched random timing at the 96.8th percentile on BTC, ETH and SOL, then reached only the 87.7th percentile out-of-sample on ten new coins against a pre-registered bar of 90, with no edge before 2022. What remained was lower drawdown, not higher return. On equities it failed immediately.
 
 The other cases collapsed earlier. Cross-sectional relative strength looked strong at +9.6% p.a. against the S&P 500 until compared against an equal-weighted hold of the same hundred tickers and stripped of five individual stocks. Ichimoku ranked in the 40th percentile against random entries matched for time-in-market. Fair Value Gap zones filled at 77–85%, statistically indistinguishable from random zones of identical width and distance at 79–83%.
 
