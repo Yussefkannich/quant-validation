@@ -51,6 +51,7 @@ Dazu kommt der Klassiker: **der eingebaute Blick in die Zukunft.** Ein falsches 
 strategien/     die getesteten Ansätze, jeder mit eigenem Selbsttest
 pruefung/       die Prüfketten, die auf ein Rohergebnis angewandt werden
 monitor/        Messwerkzeug ohne Handelsfunktion
+freqtrade/      die Gegenrechnung eines Falls in einem fremden Backtester
 ```
 
 Jedes Skript läuft eigenständig, hat `--selftest` und braucht keine API-Schlüssel. Kein Skript handelt oder greift auf ein Konto zu.
@@ -205,6 +206,51 @@ Gemessen am 12.09.2026: BTC 0,27% p.a. bei einem Break-even von 841 Tagen, ETH 0
 
 Der Mechanismus stimmt, er wird derzeit nur nicht bezahlt. Deshalb läuft `--log` weiter und meldet sich, sobald eine Rate drei Messungen in Folge über 0,01% je acht Stunden liegt.
 
+### Kreuzprüfung gegen freqtrade — das Messwerkzeug auf dem Prüfstand
+
+Alle Befunde oben stehen und fallen mit einer Annahme, die bis hierher ungeprüft blieb: dass der Backtester dieser Sammlung richtig rechnet. Ein Fehler darin würde jedes Urteil mittragen, ohne sich zu zeigen. Ein Selbsttest hilft dagegen nicht — er prüft, ob ein Programm das tut, was sein Autor erwartet, nicht ob die Erwartung stimmt.
+
+Deshalb dieselbe Regel, dieselbe Zeitspanne, zwei unabhängig entstandene Programme: `strategien/ema_crossover_backtest.py` gegen [freqtrade](https://github.com/freqtrade/freqtrade) 2026.8-dev.
+
+| | eigenes Skript | freqtrade |
+|---|---|---|
+| Datenquelle | yfinance, `BTC-USD` | Binance, `BTC/USDT` |
+| Zeitraum | ab 17.08.2017 | 12.09.2017 – 17.09.2026 |
+| Regel | EMA(12) > EMA(26) → investiert | identisch |
+| Ausführung | Schluss t → Schluss t+1 | Eröffnung t+1 |
+| Kosten | 0,10% je Positionswechsel | 0,10% je Order |
+
+**Die Vorhersage stand vor dem Vergleich fest.** freqtrade meldete 53,44% p.a. Das eigene Skript annualisiert mit 252 Handelstagen; wäre das der einzige Unterschied, müsste es 34,4% zeigen.
+
+| | freqtrade | vorhergesagt | gemessen |
+|---|---|---|---|
+| Strategie p.a. | 53,44% | 34,4% | **35,37%** |
+| Buy & Hold p.a. | 38,07% | 25,0% | **25,21%** |
+| Differenz | +15,37 pp | +9,4 pp | **+10,16 pp** |
+| Sharpe | 1,15 | 0,96 | **0,97** |
+| Positionswechsel | 100 (50 Trades) | — | **97** |
+| Größter Rückgang | 61,8% | — | **59,9%** |
+
+Vier von vier Vorhersagen treffen auf etwa einen Prozentpunkt. Die wichtigste Zeile ist die vorletzte: **beide Programme erzeugen dieselben Signale**, drei Abweichungen auf neun Jahre, erklärbar durch Yahoo-Mischkurs gegen Binance-Einzelbörse. Die verbleibende Renditedifferenz geht auf den Ausführungszeitpunkt zurück.
+
+**Der gefundene Fehler.** `cagr()` und `sharpe()` rechnen mit `pro_jahr=252`. Für Aktien ist das richtig. Krypto handelt an 365 Tagen im Jahr, die Renditereihe hat entsprechend mehr Werte, und die Hochrechnung fällt um den Faktor 252/365 im Exponenten zu niedrig aus — beim Sharpe um √(252/365) = 0,831.
+
+**Was das für die Befunde oben bedeutet: nichts.** Jedes Urteil hier beruht auf einem Vergleich — Strategie gegen Buy & Hold, gegen Zufallstiming, Teilperiode gegen Teilperiode. Die Konstante steht auf beiden Seiten und hebt sich in der Richtung auf. Das Perzentil von 96,8 bleibt, das Scheitern an der Out-of-Sample-Hürde bleibt. Zu niedrig angegeben sind die absoluten Jahresrenditen für Krypto: der Vorsprung von +7,04% p.a. wäre richtig gerechnet größer. Am Befund ändert das nichts, denn dieser Ansatz ist nicht an der Höhe seines Vorsprungs gescheitert, sondern an dessen Stabilität.
+
+**Offen.** Der Fehler ist dokumentiert und noch nicht behoben; die Korrektur folgt als eigener Commit. Sie ist weniger trivial, als sie aussieht: Sobald ein Lauf Aktien und Krypto in einem Korb mittelt — der Standardaufruf tut das mit zehn Werten —, enthält die gemittelte Reihe Zeilen mit 252 und mit 365 Werten pro Jahr. Dafür gibt es keine einzelne richtige Konstante, sondern nur getrennte Auswertung je Anlageklasse.
+
+**Was der Fall zeigt.** Gegen einen Denkfehler im eigenen Maßstab hilft kein Test, den derselbe Kopf geschrieben hat. Es braucht eine zweite, unabhängig entstandene Implementierung — und eine Vorhersage, die vorher feststeht und falsch sein kann.
+
+Reproduzieren: Strategie, Konfiguration und die Einrichtung stehen in **`freqtrade/`**.
+
+```bash
+python3 strategien/ema_crossover_backtest.py --tickers BTC-USD --start 2017-08-17 --kosten 0.0010
+
+# Gegenseite, nach Einrichtung wie in freqtrade/README.md
+freqtrade backtesting --config user_data/config.json --strategy EmaCrossoverCheck \
+    --timerange 20160101- --pairs BTC/USDT
+```
+
 ---
 
 ## Methodische Bausteine
@@ -226,6 +272,8 @@ Wiederverwendbar für jede weitere Strategie, ungefähr in der Reihenfolge ihrer
 **Hürde vorher festlegen.** Bei Ichimoku 90. Perzentil, erreicht wurden 84,2. Bei R3 vier von sechs Universen, erreicht wurde eins. Beim EMA-Crossover out-of-sample 90. Perzentil, erreicht wurden 87,7. Knapp daneben ist daneben.
 
 **Treiberausschluss.** Einzelne Werte entfernen und prüfen, ob der Effekt überlebt.
+
+**Gegen eine zweite Implementierung rechnen.** Dieselbe Regel in einem unabhängig entstandenen Programm laufen lassen und die Abweichung vorher vorhersagen. Ein Selbsttest prüft den Code gegen die Erwartung seines Autors; nur ein fremdes Werkzeug prüft die Erwartung. So kam der Annualisierungsfehler oben ans Licht.
 
 ---
 
@@ -260,3 +308,5 @@ An EMA crossover (12/26) on crypto was a near miss: it beat matched random timin
 The other cases collapsed earlier. Cross-sectional relative strength looked strong at +9.6% p.a. against the S&P 500 until compared against an equal-weighted hold of the same hundred tickers and stripped of five individual stocks. Ichimoku ranked in the 40th percentile against random entries matched for time-in-market. Fair Value Gap zones filled at 77–85%, statistically indistinguishable from random zones of identical width and distance at 79–83%.
 
 Every script runs standalone, includes a `--selftest` that works offline, verifies absence of look-ahead bias, and additionally verifies that this check actually fires by running it against a deliberately incorrect implementation. No script trades or touches an account.
+
+A self-test, however, only checks whether a program does what its author expects — not whether the expectation is correct. The final case therefore turns the method on the toolkit itself: the same EMA crossover was run in freqtrade, an independently developed open-source trading system, over the same period. The prediction was written down first. All four predicted figures came within roughly one percentage point, and both programs produced the same entry and exit signals — 97 position changes against 100, across nine years, explained by Yahoo composite prices versus a single exchange. The comparison did surface one genuine defect: `cagr()` and `sharpe()` annualise with 252 trading days, which is correct for equities but understates crypto, where markets trade 365 days a year. Because every verdict in this repository rests on a comparison in which that constant appears on both sides, the findings are unaffected; the absolute per-annum figures quoted for crypto are too low. The fix is pending and non-trivial, since a mixed basket of equities and crypto has no single correct constant.
