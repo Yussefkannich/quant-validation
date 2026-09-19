@@ -1,8 +1,12 @@
 # quant-validation
 
+### Die Zahl neben ihren Maßstab stellen
+
 Ein Werkzeugkasten, um Handelsstrategien ergebnisoffen zu prüfen — und sie fallenzulassen, wenn sie nicht tragen.
 
 Dieses Repository enthält keine Strategie, die funktioniert. Es enthält die Methode, mit der fünf populäre Ansätze widerlegt wurden, und die Zahlen dazu. Das ist Absicht: Der Wert liegt in der Prüfkette, nicht im Ergebnis.
+
+Jeder Fall hier ist derselbe Handgriff: Relative Strength gegen gleichgewichtetes Halten derselben hundert Aktien. Ichimoku gegen Zufallseinstiege mit gleicher Marktzeit. Fair Value Gap gegen Zufallszonen gleicher Breite. EMA-Crossover gegen Buy & Hold. Der eigene Backtester gegen einen fremden. Eine Zahl ohne ihren Maßstab ist keine Information — der Rest ist Ausführung.
 
 *An English summary follows at the end.*
 
@@ -297,7 +301,11 @@ Keine Anlageberatung. Der Code dient der methodischen Prüfung von Handelsstrate
 
 ## English summary
 
+**Putting the number next to its yardstick.**
+
 A toolkit for testing trading strategies against proper null hypotheses — and discarding them when they don't hold up.
+
+Every case here is the same move: relative strength against an equal-weighted hold of the same hundred tickers; Ichimoku against random entries matched for time in market; Fair Value Gap against random zones of identical width; EMA crossover against buy and hold; and finally this repository's own backtester against an independent one. A number without its yardstick carries no information — the rest is execution.
 
 This repository contains no working strategy. It contains the method by which five popular approaches were falsified, plus the numbers. That is deliberate: the value is in the validation chain, not in the result.
 
