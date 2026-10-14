@@ -4,9 +4,9 @@
 
 Ein Werkzeugkasten, um Handelsstrategien ergebnisoffen zu prüfen — und sie fallenzulassen, wenn sie nicht tragen.
 
-Dieses Repository enthält keine Strategie, die funktioniert. Es enthält die Methode, mit der fünf populäre Ansätze widerlegt wurden, und die Zahlen dazu. Das ist Absicht: Der Wert liegt in der Prüfkette, nicht im Ergebnis.
+Dieses Repository enthält keine Strategie, die funktioniert. Es enthält die Methode, mit der sechs populäre Ansätze widerlegt wurden, und die Zahlen dazu. Das ist Absicht: Der Wert liegt in der Prüfkette, nicht im Ergebnis.
 
-Jeder Fall hier ist derselbe Handgriff: Relative Strength gegen gleichgewichtetes Halten derselben hundert Aktien. Ichimoku gegen Zufallseinstiege mit gleicher Marktzeit. Fair Value Gap gegen Zufallszonen gleicher Breite. EMA-Crossover gegen Buy & Hold. Der eigene Backtester gegen einen fremden. Eine Zahl ohne ihren Maßstab ist keine Information — der Rest ist Ausführung.
+Jeder Fall hier ist derselbe Handgriff: Relative Strength gegen gleichgewichtetes Halten derselben hundert Aktien. Ichimoku gegen Zufallseinstiege mit gleicher Marktzeit. Fair Value Gap gegen Zufallszonen gleicher Breite. EMA-Crossover gegen Buy & Hold. Nachrichten-Ereignisse gegen zufällige Tage. Der eigene Backtester gegen einen fremden. Eine Zahl ohne ihren Maßstab ist keine Information — der Rest ist Ausführung.
 
 *An English summary follows at the end.*
 
@@ -23,6 +23,7 @@ Jeder Fall hier ist derselbe Handgriff: Relative Strength gegen gleichgewichtete
 | EMA-Crossover 12/26 (Aktien) | −11,8% p.a. gegen Buy & Hold | 36. Perzentil gegen Zufallstiming | verworfen |
 | EMA-Crossover 12/26 (Krypto) | +7,0% p.a., 96,8. Perzentil | out-of-sample 87,7. Perzentil, vor 2022 kein Vorsprung | verworfen |
 | **R3 / Larry Connors (RSI-2)** | **+0,50% je Trade, t=5,75 nach Cluster-Korrektur** | **out-of-sample 1 von 6 Märkten** | **verworfen** |
+| Nachrichten-Ereignisse → BTC (9 Themen, GDELT) | beste Zelle +1,5% in 3 Tagen, p=0,08 | 0 von 18 Zellen nach Mehrfachtest-Korrektur | verworfen |
 | Funding-Rate-Carry (Perpetuals) | Werbung: 10–30% p.a. | gemessen: 0,3–0,4% p.a. netto | derzeit unattraktiv |
 
 Jede Zeile ist reproduzierbar. Die Befehle stehen weiter unten.
@@ -69,6 +70,7 @@ Jedes Skript läuft eigenständig, hat `--selftest` und braucht keine API-Schlü
 | `fvg_backtest.py` | Fair Value Gap gegen Zufallszonen gleicher Breite, gleichen Abstands, gleicher Richtung |
 | `r3_backtest.py` | R3 nach Larry Connors gegen Zufallseinstiege gleicher Haltedauer |
 | `ema_crossover_backtest.py` | EMA-Crossover gegen Buy & Hold und Zufallstiming, Parameter-Gitter mit EMA und SMA nebeneinander |
+| `news_event_study.py` | Ereignisstudie: Nachrichtenspitzen aus GDELT (9 Themen) gegen Zufallstage, Long *und* Short, In-Sample/Out-of-Sample |
 
 ### pruefung/
 
@@ -92,7 +94,7 @@ Jedes Skript läuft eigenständig, hat `--selftest` und braucht keine API-Schlü
 
 ```bash
 pip install yfinance pandas numpy
-./run_selftests.sh          # alle elf Selbsttests, ohne Netzverbindung
+./run_selftests.sh          # alle zwölf Selbsttests, ohne Netzverbindung
 ```
 
 ---
@@ -186,6 +188,38 @@ python3 pruefung/ema_oos.py
 Im Mittel +4,22% p.a., aber bei einem t-Wert auf Log-Renditen von 0,23. Dazu kommt eine Verzerrung zugunsten der Strategie: Bei acht der zehn Coins beginnen die Daten im Dezember 2017, nahe am damaligen Hoch.
 
 Was übrig bleibt, ist Risikominderung: ein größter Rückgang von −60,4% statt −89,5% bei 38–57% Marktzeit. Das war nicht die vorab gestellte Frage und müsste als eigener Versuch auf neuen Daten geprüft werden.
+
+### Nachrichten-Ereignisse — ist die Zeitung schneller als der Kurs?
+
+Die Idee: Ein Bot liest die Nachrichten, erkennt ein Ereignis — Zinsentscheid, Börsen-Hack, ETF-Meldung, Regulierung —, vergleicht es mit ähnlichen Ereignissen der Vergangenheit und setzt auf steigende oder fallende Kurse, je nachdem, wie Bitcoin damals reagiert hat. Bevor ein solcher Bot gebaut wird, muss eine Frage beantwortet sein: Gibt es diese Reaktion überhaupt, und zwar *nachdem* die Nachricht bekannt ist?
+
+```bash
+python3 strategien/news_event_study.py --selftest
+python3 strategien/news_event_study.py --fetch     # GDELT + BTC, 18 Abfragen
+python3 strategien/news_event_study.py --run
+```
+
+**Daten.** [GDELT](https://www.gdeltproject.org/) erfasst Nachrichten weltweit in 65 Sprachen, maschinell übersetzt. Je Thema und Tag: Zahl der Artikel, Gesamtzahl aller erfassten Artikel und mittlere Tonalität, 2017 bis Oktober 2026. Dazu BTC-Tagesschlusskurse von Bitstamp. Neun Themen: Fed-Zinsen, Inflation, Krypto-Regulierung, Bitcoin-ETF, Hacks und Pleiten, Firmen kaufen BTC, staatliche Adoption, Bankenkrise, Krieg und Geopolitik.
+
+**Ereignis.** Ein Tag, an dem der *Anteil* eines Themas an allen Nachrichten mindestens drei robuste Standardabweichungen über dem Median der 60 Vortage liegt — nur Vergangenheit, kein Blick nach vorn. Danach sieben Tage Sperre, damit eine Geschichte nicht fünfmal zählt. Die Tonalität gegenüber den Vortagen teilt jedes Thema in „negativ“ und „positiv“. Ergibt 18 Zellen und 1194 Ereignisse.
+
+**Einstieg zum Tagesschluss des Ereignistages.** Die Bewegung *am* Ereignistag zählt nicht mit — wer die Nachricht im Tagesdatensatz sieht, kommt für sie zu spät. Der Selbsttest prüft genau das: Eine eingepflanzte Kursbewegung am Ereignistag darf kein Signal erzeugen, und eine absichtlich falsche Implementierung mit Einstieg am Vortag muss darauf hereinfallen.
+
+**Hürde, vorab im Code.** Horizont drei Tage. In-Sample bis 2022: mindestens 15 Ereignisse und Holm-korrigiert p ≤ 0,10 über alle Zellen; daraus folgt die Seite, long oder short. Out-of-Sample ab 2023: mindestens 10 Ereignisse, dieselbe Richtung mit p ≤ 0,10 und nach 0,52% Rundreisegebühr im Plus.
+
+**Ergebnis.** Keine der 18 Zellen besteht. In-Sample erreicht keine Zelle auch nur p < 0,05; nach Holm-Korrektur steht überall 1,0. Zinsentscheide (p = 0,28 und 0,32) und Inflationsdaten (0,76 und 0,87) — die Themen mit dem plausibelsten Mechanismus — sind am deutlichsten leer.
+
+Die vollständige Ausgabe des Laufs vom 14.10.2026 liegt in `strategien/news_event_study_ergebnis.txt`.
+
+| Zelle | In-Sample bis 2022 | Out-of-Sample ab 2023 | Einstieg einen Tag später |
+|---|---|---|---|
+| Krypto-Regulierung, negativ | +1,52%, p=0,077 | +1,07%, p=0,079 | −0,06%, p=0,95 |
+| Krieg/Geopolitik, negativ | +0,58%, p=0,55 | +1,98%, p=0,012 | +1,28%, p=0,19 |
+| Bitcoin-ETF, negativ | −1,36%, p=0,26 | +0,59%, p=0,75 | −2,46%, p=0,043 |
+
+Die erste Zeile ist die einzige, die in beiden Zeiträumen in dieselbe Richtung zeigt: Nach schlechten Regulierungsnachrichten erholte sich BTC eher. Drei Gründe, sie trotzdem nicht als Fund zu werten: Bei 18 Zellen ergibt sich ein solches Paar mit rund 10% Wahrscheinlichkeit durch Zufall. Steigt man einen Tag später ein, verschwindet der Effekt vollständig — er sitzt im ersten Tag, wo Tagesstempel am wenigsten verlässlich sind. Und die vorab gesetzte Hürde verfehlt sie nicht knapp, sondern deutlich. Die beiden anderen Zeilen zeigen das übliche Bild: ein guter Wert in einer Hälfte oder einer Variante, der in der anderen nicht wiederkehrt.
+
+**Was der Fall zeigt.** Bis eine Nachricht in einem Tagesdatensatz auftaucht, ist sie im Bitcoin-Kurs eingepreist. Ein Bot, der Zeitungen liest, handelt mit Wissen, das der Markt schon verarbeitet hat. Ob es innerhalb von Minuten anders aussieht, lässt sich mit diesen Daten nicht prüfen: GDELT liefert Viertelstunden nur für die letzten drei Monate.
 
 ### Fair Value Gap — wenn eine Trefferquote nichts misst
 
@@ -287,6 +321,7 @@ Wiederverwendbar für jede weitere Strategie, ungefähr in der Reihenfolge ihrer
 - Die Ticker-Listen bestehen aus heutigen Index-Mitgliedern. Der Survivorship Bias ist im Code dokumentiert, aber nicht behoben — dafür bräuchte es historische Index-Zusammensetzungen.
 - Fair Value Gap wird üblicherweise auf Minuten- und Stundencharts gehandelt. Das Tagesergebnis widerlegt die Tagesvariante sauber, die Intraday-Variante nur indirekt.
 - Die Krypto-Kursreihen von yfinance beginnen für viele Coins erst im Dezember 2017, nahe einem Höchststand. Das benachteiligt Buy & Hold.
+- Die Nachrichten-Studie arbeitet mit Tagesdaten und Schlagwortsuchen. Sie widerlegt eine Reaktion über Tage, nicht über Minuten; die Themenauswahl ist eine von vielen möglichen und wurde vor dem ersten Lauf festgelegt.
 - Die Ausstiegsregeln sind bewusst einfach gehalten, meist ohne Stop-Loss.
 - Keine Steuern, keine Slippage-Modellierung über den Spread hinaus.
 - Ein negatives Out-of-Sample-Ergebnis widerlegt eine Strategie in den geprüften Märkten, nicht in allen denkbaren.
@@ -305,15 +340,17 @@ Keine Anlageberatung. Der Code dient der methodischen Prüfung von Handelsstrate
 
 A toolkit for testing trading strategies against proper null hypotheses — and discarding them when they don't hold up.
 
-Every case here is the same move: relative strength against an equal-weighted hold of the same hundred tickers; Ichimoku against random entries matched for time in market; Fair Value Gap against random zones of identical width; EMA crossover against buy and hold; and finally this repository's own backtester against an independent one. A number without its yardstick carries no information — the rest is execution.
+Every case here is the same move: relative strength against an equal-weighted hold of the same hundred tickers; Ichimoku against random entries matched for time in market; Fair Value Gap against random zones of identical width; EMA crossover against buy and hold; news events against random days; and finally this repository's own backtester against an independent one. A number without its yardstick carries no information — the rest is execution.
 
-This repository contains no working strategy. It contains the method by which five popular approaches were falsified, plus the numbers. That is deliberate: the value is in the validation chain, not in the result.
+This repository contains no working strategy. It contains the method by which six popular approaches were falsified, plus the numbers. That is deliberate: the value is in the validation chain, not in the result.
 
 The most instructive case is R3 (Larry Connors, 2-period RSI mean reversion). It passed three stages — beating matched random entries at +0.50% per trade, surviving cluster-corrected significance at t=5.75, and holding at 0.355% after excluding the four strongest tickers. By any conventional standard it was a confirmed strategy. It then failed out-of-sample: across six markets never used during development, only one cleared the pre-registered bar, and four of six turned negative from 2022 onward.
 
 An EMA crossover (12/26) on crypto was a near miss: it beat matched random timing at the 96.8th percentile on BTC, ETH and SOL, then reached only the 87.7th percentile out-of-sample on ten new coins against a pre-registered bar of 90, with no edge before 2022. What remained was lower drawdown, not higher return. On equities it failed immediately.
 
 The other cases collapsed earlier. Cross-sectional relative strength looked strong at +9.6% p.a. against the S&P 500 until compared against an equal-weighted hold of the same hundred tickers and stripped of five individual stocks. Ichimoku ranked in the 40th percentile against random entries matched for time-in-market. Fair Value Gap zones filled at 77–85%, statistically indistinguishable from random zones of identical width and distance at 79–83%.
+
+A news-driven approach was tested as an event study: spikes in global news coverage (GDELT, 65 languages, 2017–2026) across nine themes — Fed rates, inflation, crypto regulation, Bitcoin ETFs, hacks and insolvencies, corporate BTC purchases, state adoption, banking crises, war — split by tone into 18 cells and 1,194 events, entering at the close of the event day so that same-day moves are excluded. None of the 18 cells reached p < 0.05 in-sample; after Holm correction every cell stood at 1.0. The single cell pointing the same way in both periods (negative regulatory news, +1.5% over three days) vanished entirely when entry was delayed by one day. By the time news appears in daily data, Bitcoin has already priced it.
 
 Every script runs standalone, includes a `--selftest` that works offline, verifies absence of look-ahead bias, and additionally verifies that this check actually fires by running it against a deliberately incorrect implementation. No script trades or touches an account.
 

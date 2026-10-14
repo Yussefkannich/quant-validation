@@ -5,3 +5,5 @@ funding_alarms.log
 funding_alarm_state.json
 funding_cron.log
 *.csv
+cache/
+ergebnis.txt
