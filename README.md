@@ -6,7 +6,7 @@ Ein Werkzeugkasten, um Handelsstrategien ergebnisoffen zu prüfen — und sie fa
 
 Dieses Repository enthält keine Strategie, die funktioniert. Es enthält die Methode, mit der sechs populäre Ansätze widerlegt wurden, und die Zahlen dazu. Das ist Absicht: Der Wert liegt in der Prüfkette, nicht im Ergebnis.
 
-Jeder Fall hier ist derselbe Handgriff: Relative Strength gegen gleichgewichtetes Halten derselben hundert Aktien. Ichimoku gegen Zufallseinstiege mit gleicher Marktzeit. Fair Value Gap gegen Zufallszonen gleicher Breite. EMA-Crossover gegen Buy & Hold. Nachrichten-Ereignisse gegen zufällige Tage. Der eigene Backtester gegen einen fremden. Eine Zahl ohne ihren Maßstab ist keine Information — der Rest ist Ausführung.
+Jeder Fall hier ist derselbe Handgriff: Relative Strength gegen gleichgewichtetes Halten derselben hundert Aktien. Ichimoku gegen Zufallseinstiege mit gleicher Marktzeit. Fair Value Gap gegen Zufallszonen gleicher Breite. EMA-Crossover gegen Buy & Hold. Nachrichten-Ereignisse gegen zufällige Tage. Der eigene Backtester gegen einen fremden. Und einmal außerhalb der Märkte: 50 Jahre Lottozahlen gegen den reinen Zufall — und die Lehrbuch-Formel gegen eine Simulation. Eine Zahl ohne ihren Maßstab ist keine Information — der Rest ist Ausführung.
 
 *An English summary follows at the end.*
 
@@ -24,6 +24,7 @@ Jeder Fall hier ist derselbe Handgriff: Relative Strength gegen gleichgewichtete
 | EMA-Crossover 12/26 (Krypto) | +7,0% p.a., 96,8. Perzentil | out-of-sample 87,7. Perzentil, vor 2022 kein Vorsprung | verworfen |
 | **R3 / Larry Connors (RSI-2)** | **+0,50% je Trade, t=5,75 nach Cluster-Korrektur** | **out-of-sample 1 von 6 Märkten** | **verworfen** |
 | Nachrichten-Ereignisse → BTC (9 Themen, GDELT) | beste Zelle +1,5% in 3 Tagen, p=0,08 | 0 von 18 Zellen nach Mehrfachtest-Korrektur | verworfen |
+| Lotto 6aus49: „heiße Zahlen“ tippen (50 Jahre) | Zahl 6: 541× statt 485 erwartet | korrigiert p=0,105, Lehrbuch-Test fehlkalibriert | verworfen |
 | Funding-Rate-Carry (Perpetuals) | Werbung: 10–30% p.a. | gemessen: 0,3–0,4% p.a. netto | derzeit unattraktiv |
 
 Jede Zeile ist reproduzierbar. Die Befehle stehen weiter unten.
@@ -81,6 +82,7 @@ Jedes Skript läuft eigenständig, hat `--selftest` und braucht keine API-Schlü
 | `r3_stress.py` | Cluster-korrigierte Signifikanz, Portfolio-Simulation mit begrenzten Plätzen, Verlustverteilung, Gebührenstaffel |
 | `r3_oos.py` | Out-of-Sample auf sechs Märkten, die im Haupttest nicht vorkamen — ohne jede Parametersuche |
 | `ema_oos.py` | Out-of-Sample des EMA-Crossovers auf zehn neuen Coins, Parameter und Hürde fest im Code |
+| `lotto_zufallstest.py` | 3.959 Lotto-Ziehungen seit 1976 gegen Gleichverteilung: korrigierter Chi-Quadrat-Test, Monte-Carlo-Gegenprobe, Kalibrierungstest |
 
 ### monitor/
 
@@ -94,7 +96,7 @@ Jedes Skript läuft eigenständig, hat `--selftest` und braucht keine API-Schlü
 
 ```bash
 pip install yfinance pandas numpy
-./run_selftests.sh          # alle zwölf Selbsttests, ohne Netzverbindung
+./run_selftests.sh          # alle dreizehn Selbsttests, ohne Netzverbindung
 ```
 
 ---
@@ -221,6 +223,34 @@ Die erste Zeile ist die einzige, die in beiden Zeiträumen in dieselbe Richtung 
 
 **Was der Fall zeigt.** Bis eine Nachricht in einem Tagesdatensatz auftaucht, ist sie im Bitcoin-Kurs eingepreist. Ein Bot, der Zeitungen liest, handelt mit Wissen, das der Markt schon verarbeitet hat. Ob es innerhalb von Minuten anders aussieht, lässt sich mit diesen Daten nicht prüfen: GDELT liefert Viertelstunden nur für die letzten drei Monate.
 
+### Lotto 6aus49 — wenn die Formel selbst danebenliegt
+
+Ein Ausflug außerhalb der Märkte, mit derselben Frage wie überall hier: Steckt in den Daten der Vergangenheit etwas, das sich für die Zukunft nutzen lässt? Lotto-„Systeme“ versprechen das mit heißen und überfälligen Zahlen.
+
+```bash
+python3 pruefung/lotto_zufallstest.py              # letzte 50 Jahre, lädt das Archiv
+python3 pruefung/lotto_zufallstest.py --jahre 10
+python3 pruefung/lotto_zufallstest.py --selftest
+```
+
+**Daten.** Alle 3.959 Ziehungen vom 16.10.1976 bis 14.10.2026 aus [daowa89/lottery-archive](https://github.com/daowa89/lottery-archive). Bei Zufall müsste jede Zahl rund 485-mal gezogen worden sein. Tatsächlich reicht die Spanne von 415 (die 45) bis 541 (die 6).
+
+**Der erste Test lag daneben.** Der Chi-Quadrat-Test aus dem Lehrbuch meldete p = 0,247. Die Gegenprobe — 2.000 simulierte Lottoreihen mit fairen Kugeln — ergab p = 0,098. Zwei Methoden, Faktor 2,5 Unterschied.
+
+Die Ursache: Der Lehrbuch-Test setzt unabhängige Einzelziehungen voraus. Beim Lotto werden sechs Kugeln **ohne Zurücklegen** gezogen, jede Zahl kommt pro Ziehung höchstens einmal vor. Die Häufigkeiten streuen dadurch um den Faktor 43/49 weniger, als der Test annimmt — er wird zu nachsichtig und übersieht Auffälligkeiten. Mit der Korrektur ×48/43 stimmen Formel und Simulation überein:
+
+| | p-Wert |
+|---|---|
+| Lehrbuch-Test | 0,247 |
+| korrigierter Test | **0,105** |
+| Monte-Carlo, 2.000 faire Reihen | **0,098** |
+
+Der Selbsttest prüft die Korrektur über ihre Kalibrierung: Auf 400 fairen Datensätzen muss der Test in rund 5% der Fälle anschlagen, nicht deutlich weniger. Dazu muss er eine gezinkte Reihe erkennen, in der die 7 bevorzugt wird.
+
+**Ergebnis.** Auch korrigiert sind die Ziehungen vom Zufall nicht unterscheidbar. Keine Sechser-Kombination wurde in 50 Jahren zweimal gezogen. Wer „heiße Zahlen“ tippt, hat dieselbe Chance wie mit jeder anderen Reihe: 1 zu 13.983.816.
+
+**Was der Fall zeigt.** Am Urteil ändert die Korrektur nichts — an der Methode sehr wohl. Eine Standardformel, deren Voraussetzung nicht erfüllt ist, liefert eine Zahl, die seriös aussieht und in die falsche Richtung irrt. Aufgefallen ist das nur, weil eine zweite, unabhängige Rechnung danebenstand.
+
 ### Fair Value Gap — wenn eine Trefferquote nichts misst
 
 ```bash
@@ -309,6 +339,8 @@ Wiederverwendbar für jede weitere Strategie, ungefähr in der Reihenfolge ihrer
 
 **Hürde vorher festlegen.** Bei Ichimoku 90. Perzentil, erreicht wurden 84,2. Bei R3 vier von sechs Universen, erreicht wurde eins. Beim EMA-Crossover out-of-sample 90. Perzentil, erreicht wurden 87,7. Knapp daneben ist daneben.
 
+**Formel gegen Simulation.** Jeder statistische Test hat Voraussetzungen. Eine Monte-Carlo-Simulation des tatsächlichen Datenprozesses zeigt, ob sie erfüllt sind. Beim Lotto lag der Lehrbuch-Test um den Faktor 2,5 daneben.
+
 **Treiberausschluss.** Einzelne Werte entfernen und prüfen, ob der Effekt überlebt.
 
 **Gegen eine zweite Implementierung rechnen.** Dieselbe Regel in einem unabhängig entstandenen Programm laufen lassen und die Abweichung vorher vorhersagen. Ein Selbsttest prüft den Code gegen die Erwartung seines Autors; nur ein fremdes Werkzeug prüft die Erwartung. So kam der Annualisierungsfehler oben ans Licht.
@@ -351,6 +383,8 @@ An EMA crossover (12/26) on crypto was a near miss: it beat matched random timin
 The other cases collapsed earlier. Cross-sectional relative strength looked strong at +9.6% p.a. against the S&P 500 until compared against an equal-weighted hold of the same hundred tickers and stripped of five individual stocks. Ichimoku ranked in the 40th percentile against random entries matched for time-in-market. Fair Value Gap zones filled at 77–85%, statistically indistinguishable from random zones of identical width and distance at 79–83%.
 
 A news-driven approach was tested as an event study: spikes in global news coverage (GDELT, 65 languages, 2017–2026) across nine themes — Fed rates, inflation, crypto regulation, Bitcoin ETFs, hacks and insolvencies, corporate BTC purchases, state adoption, banking crises, war — split by tone into 18 cells and 1,194 events, entering at the close of the event day so that same-day moves are excluded. None of the 18 cells reached p < 0.05 in-sample; after Holm correction every cell stood at 1.0. The single cell pointing the same way in both periods (negative regulatory news, +1.5% over three days) vanished entirely when entry was delayed by one day. By the time news appears in daily data, Bitcoin has already priced it.
+
+One case steps outside markets: 3,959 German Lotto 6/49 draws since 1976, tested for "hot numbers". The textbook chi-square test reported p = 0.247, but a Monte Carlo simulation of fair draws gave p = 0.098. The textbook test assumes independent single draws; lottery balls are drawn without replacement, which shrinks the variance of the counts by 43/49. After a 48/43 correction both methods agree (p = 0.105 vs 0.098), and a calibration self-test confirms the corrected test fires in about 5% of fair datasets. The draws remain indistinguishable from chance — but the uncorrected formula would have been quietly wrong.
 
 Every script runs standalone, includes a `--selftest` that works offline, verifies absence of look-ahead bias, and additionally verifies that this check actually fires by running it against a deliberately incorrect implementation. No script trades or touches an account.
 
